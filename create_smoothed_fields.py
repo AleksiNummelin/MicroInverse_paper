@@ -19,6 +19,9 @@ calc_weights=False
 apply_weights=True
 model_data=False
 smooth_highpass=False
+#
+n_weights=[2,4,6,8,10,15]
+#
 #load a dummy field
 if not model_data:
  filepath = '/datascope/hainegroup/anummel1/Projects/MicroInv/sst_data/amsr_avhrr/annual_files/'
@@ -70,7 +73,7 @@ if model_data:
 
 #first calculate weights
 if calc_weights:
-  for n in [1]:#[2,4]: #[8,10]: #[2,4,6]: #,10,15]:
+  for n in n_weights:
      print(n)
      dum,weights_out=mutils.smooth2D_parallel(lon,lat,sst,n=n,num_cores=30,use_weights=True,weights_only=True,use_median=False,save_weights=True,save_path=wpath)
 
@@ -135,45 +138,37 @@ def smooth_file(ff,n,filepath,fname,outpath,t_inds2,weights_out,var='sst',model_
     f0.close()
         
 if apply_weights:
- for n in [8]:
- #for n in [16]: #[2,4]: #[8,10]: #[2,4,6]: #]
- #for n in [15]: #,10,15]:
- #for [5,6,10,15]:
-   print(n)
-   if n<6:
-     n_cores=12
-   elif n<10:
-     n_cores=8
-   elif n<14:
-     n_cores=4
-   else:
-     n_cores=4
-   #
-   d2=np.load(wpath+str(n)+'_degree_smoothing_weights_coslat_y'+str(n)+'_x'+str(2*n)+'.npz')
-   #weights_out=d2['weights_out'][:]
-   #jind=d2['jind'][:]
-   #iind=d2['iind'][:]
-   #
-   t_inds=ma.reshape(np.arange(sst.ravel().shape[0]),(sst.shape[0],sst.shape[1])) #create array of indices                                                                    
-   #t_inds2=t_inds[list(weights_out[:,:,1]),list(weights_out[:,:,2])] 
-   #
-   folder1 = tempfile.mkdtemp()
-   path1 =  os.path.join(folder1, 'weights_out.mmap')
-   path2 =  os.path.join(folder1, 't_inds2.mmap')
-   #
-   weights_out=np.memmap(path1, dtype=float, shape=d2['weights_out'].shape, mode='w+')
-   t_inds2=np.memmap(path2, dtype=int, shape=d2['weights_out'].shape[:2], mode='w+')
-   #
-   weights_out[:]=d2['weights_out'][:]
-   t_inds2[:]=t_inds[weights_out[:,:,1].astype('int'),weights_out[:,:,2].astype('int')]
-   #this will give you [len(inds),n**2] shaped array of indices matching to corresponding points in data.ravel()
-   if n==15:
-     Parallel(n_jobs=n_cores)(delayed(smooth_file)(ff,n,filepath,fname,outpath,t_inds2,weights_out,var=var,model_data=model_data,smooth_highpass=smooth_highpass) for ff,fname in enumerate(fnames[10:]))
-   else:
-     Parallel(n_jobs=n_cores)(delayed(smooth_file)(ff,n,filepath,fname,outpath,t_inds2,weights_out,var=var,model_data=model_data,smooth_highpass=smooth_highpass) for ff,fname in enumerate(fnames))
-   try:
-    shutil.rmtree(folder1)
-   except OSError:
-    pass 
+   for n in n_weights:
+     print(n)
+     if n<6:
+         n_cores=12
+     elif n<10:
+         n_cores=8
+     elif n<14:
+         n_cores=4
+     else:
+         n_cores=4
+     #
+     d2=np.load(wpath+str(n)+'_degree_smoothing_weights_coslat_y'+str(n)+'_x'+str(2*n)+'.npz')
+     t_inds  = ma.reshape(np.arange(sst.ravel().shape[0]),(sst.shape[0],sst.shape[1]))
+     #
+     folder1 = tempfile.mkdtemp()
+     path1   =  os.path.join(folder1, 'weights_out.mmap')
+     path2   =  os.path.join(folder1, 't_inds2.mmap')
+     #
+     weights_out = np.memmap(path1, dtype=float, shape=d2['weights_out'].shape, mode='w+')
+     t_inds2     = np.memmap(path2, dtype=int, shape=d2['weights_out'].shape[:2], mode='w+')
+     #
+     weights_out[:] = d2['weights_out'][:]
+     t_inds2[:]     = t_inds[weights_out[:,:,1].astype('int'),weights_out[:,:,2].astype('int')]
+     #this will give you [len(inds),n**2] shaped array of indices matching to corresponding points in data.ravel()
+     if n==15:
+         Parallel(n_jobs=n_cores)(delayed(smooth_file)(ff,n,filepath,fname,outpath,t_inds2,weights_out,var=var,model_data=model_data,smooth_highpass=smooth_highpass) for ff,fname in enumerate(fnames[10:]))
+     else:
+         Parallel(n_jobs=n_cores)(delayed(smooth_file)(ff,n,filepath,fname,outpath,t_inds2,weights_out,var=var,model_data=model_data,smooth_highpass=smooth_highpass) for ff,fname in enumerate(fnames))
+     try:
+        shutil.rmtree(folder1)
+     except OSError:
+        pass 
 
     
